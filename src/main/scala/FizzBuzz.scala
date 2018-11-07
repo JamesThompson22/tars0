@@ -3,6 +3,7 @@ import com.softwaremill.macmemo.memoize
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.language.postfixOps
 
 class FizzBuzz {
   def divisibleByThree(n: Int): Future[Boolean] = Future(n % 3 == 0)
@@ -24,4 +25,7 @@ class FizzBuzz {
 
   @memoize(maxSize = 2000, expiresAfter = 100 second)
   def mDivisibleByFiveP(n: Int): Future[Boolean] = divisibleBy(n, 5)
+
+  @memoize(2000, 100 seconds)
+  def mDivisibleBy(n: Int, n2: Int):Future[Boolean] = divisibleBy(n, n2)
 }

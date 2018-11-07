@@ -1,7 +1,7 @@
 import org.mockito.Mockito
 import org.scalatest.FunSuite
 import org.scalatest.concurrent.ScalaFutures
-import org.slf4j.Logger
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -9,19 +9,20 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 
 class RulesEngineSpec extends FunSuite with ScalaFutures {
-  val fakeLogger = Mockito.spy(classOf[Logger])
+  val fakeLogger:Logger = Mockito.spy(classOf[Logger])
+  val realLogger:Logger = LoggerFactory.getLogger("testLogger")
   val engine = new RulesEngine(fakeLogger)
 
 
   test("An empty sequence of rules returns a None as a consequence when asseses") {
-    val result = Await.result(engine.assess(Seq()), 5 seconds)
-    assert(result == None)
+    val result = Await.result(engine.assessLogged(Seq()), 5 seconds)
+    assert(result isEmpty)
   }
 
   test("A sequence of rules returns the value of the leftmost rule where the precedent evaluates to Future.successful(true) when assessed") {
     val rules = Seq((() => Future(true), "FIRST-TRUE-RULE"), (() => Future(false), "FALSE-RULE"))
-    val result = Await.result(engine.assess(rules), 5 seconds)
-    assert(result == Some("FIRST-TRUE-RULE"))
+    val result = Await.result(engine.assessLogged(rules), 5 seconds)
+    assert(result contains "FIRST-TRUE-RULE")
   }
 
   test("A sequence of rules with some precedents evaluating to false at the beginning, skips over them to the first true rule") {
@@ -30,8 +31,8 @@ class RulesEngineSpec extends FunSuite with ScalaFutures {
       (() => Future(true))  -> "FIRST-TRUE-RULE",
       (() => Future(false)) -> "SECOND-FALSE-RULE"
     )
-    val result = Await.result(engine.assess(rules), 5 seconds)
-    assert(result == Some("FIRST-TRUE-RULE"))
+    val result = Await.result(engine.assessLogged(rules), 5 seconds)
+    assert(result contains "FIRST-TRUE-RULE")
   }
 
   test("A sequence of rules with some precedents evaluating to false at the beginning, skips over them to the first true rule, subsequent true rules are ignored") {
@@ -41,8 +42,8 @@ class RulesEngineSpec extends FunSuite with ScalaFutures {
       (() => Future(false)) -> "SECOND-FALSE-RULE",
       (() => Future(true)) -> "SECOND-TRUE-RULE"
     )
-    val result = Await.result(engine.assess(rules), 5 seconds)
-    assert(result == Some("FIRST-TRUE-RULE"))
+    val result = Await.result(engine.assessLogged(rules), 5 seconds)
+    assert(result contains "FIRST-TRUE-RULE")
   }
 
   test("A sequence of rules with all precedents evaluating to false returns None") {
@@ -52,8 +53,8 @@ class RulesEngineSpec extends FunSuite with ScalaFutures {
       (() => Future(false)) -> "THIRD-FALSE-RULE",
       (() => Future(false)) -> "FOURTH-FALSE-RULE"
     )
-    val result = Await.result(engine.assess(rules), 5 seconds)
-    assert(result == None)
+    val result = Await.result(engine.assessLogged(rules), 5 seconds)
+    assert(result isEmpty)
   }
 
   test("A sequence of rules with an early true followed by a failure returns the value associated with the true") {
@@ -63,8 +64,8 @@ class RulesEngineSpec extends FunSuite with ScalaFutures {
       (() => Future.failed(new RuntimeException("fail"))) -> "FAIL",
       (() => Future(false)) -> "THIRD-FALSE-RULE"
     )
-    val result = Await.result(engine.assess(rules), 5 seconds)
-    assert(result == Some("FIRST-TRUE-RULE"))
+    val result = Await.result(engine.assessLogged(rules), 5 seconds)
+    assert(result contains "FIRST-TRUE-RULE")
   }
 
   test("A sequence of rules with an early fail followed by a true returns the failure") {
@@ -75,7 +76,7 @@ class RulesEngineSpec extends FunSuite with ScalaFutures {
       (() => Future(false)) -> "THIRD-FALSE-RULE"
     )
     val result = intercept[RuntimeException] {
-      Await.result(engine.assess(rules), 5 seconds)
+      Await.result(engine.assessLogged(rules), 5 seconds)
     }
     assert(result.getMessage == "fail")
   }
@@ -89,7 +90,7 @@ class RulesEngineSpec extends FunSuite with ScalaFutures {
       (() => Future(false)) -> "THIRD-FALSE-RULE"
     )
     val result = intercept[RuntimeException] {
-      Await.result(engine.assess(rules), 5 seconds)
+      Await.result(engine.assessLogged(rules), 5 seconds)
     }
     assert(result.getMessage == "fail0")
   }
