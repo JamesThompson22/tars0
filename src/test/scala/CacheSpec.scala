@@ -17,7 +17,7 @@ import scala.language.postfixOps
 class CacheSpec extends FunSuite with ScalaFutures {
   val fakeLogger:Logger = Mockito.spy(classOf[Logger])
   val realLogger:Logger = LoggerFactory.getLogger("testLogger")
-  val engine = new RulesEngine(fakeLogger)
+  val engine = new RulesEngine(realLogger)
 
   test("Rules can be constructed for fizzbuzz as a table") {
     val scenarios = Tables.Table[Int, String](
@@ -49,7 +49,6 @@ class CacheSpec extends FunSuite with ScalaFutures {
       (() => Future(true)) -> n.toString
     )
 
-    println("test1")
     TableDrivenPropertyChecks.forAll(scenarios) { (n, expected) =>
       val result = Await.result(engine.assessLogged(rules(n), "fizzbuzz"), 5 seconds).get
       assert(expected == result)
@@ -66,7 +65,6 @@ class CacheSpec extends FunSuite with ScalaFutures {
       (() => Future(true)) -> n.toString
     )
 
-    println("test2")
     val result = Await.result(engine.assessLogged(rules(15), "fizzbuzz"), 5 seconds).get
     assert(result == "fizzbuzz")
     verify(fizzBuzz).divisibleByThree(15)
@@ -83,7 +81,6 @@ class CacheSpec extends FunSuite with ScalaFutures {
       (() => Future(true)) -> n.toString
     )
 
-    println("test3")
     val result = Await.result(engine.assessLogged(rules(1), "memoized fizzbuzz"), 5 seconds).get
     assert(result == "1")
     verify(fizzBuzz).divisibleByThree(1)
@@ -100,7 +97,6 @@ class CacheSpec extends FunSuite with ScalaFutures {
       (() => Future(true)) -> n.toString
     )
 
-    println("test4")
     val result = Await.result(engine.assessLogged(rules(1), "memoized fizzbuzz"), 30 seconds).get
     assert(result == "1")
     verify(fizzBuzz).divisibleBy(1, 3)
@@ -125,7 +121,6 @@ class CacheSpec extends FunSuite with ScalaFutures {
       (result, (end - start) / 1e9)
     }
 
-    println("test5")
     val (result, secs) = time(Await.result(engine.assessLogged(rules(1), "memoized fizzbuzz"), 30 seconds).get)
     assert(result == "1")
     assert(secs > 1)
@@ -139,10 +134,10 @@ class CacheSpec extends FunSuite with ScalaFutures {
     val fizzBuzz = spy(new FizzBuzz())
 
     def rules(n: Int) = Seq(
-      (() => all(fizzBuzz.mDivisibleByThreeP(n), fizzBuzz.mDivisibleByFiveP(n))) -> "fizzbuzz",
-      (() => fizzBuzz.mDivisibleByThreeP(n)) -> "fizz",
-      (() => fizzBuzz.mDivisibleByFiveP(n)) -> "buzz",
-      (() => Future(true)) -> n.toString
+      "All" -> (() => all(fizzBuzz.mDivisibleByThreeP(n), fizzBuzz.mDivisibleByFiveP(n))) -> "fizzbuzz",
+      "Three" -> (() => fizzBuzz.mDivisibleByThreeP(n)) -> "fizz",
+      "Five" -> (() => fizzBuzz.mDivisibleByFiveP(n)) -> "buzz",
+      "None" -> (() => Future(true)) -> n.toString
     )
 
     def time[R](block: => R): (R, Double) = {
@@ -152,35 +147,41 @@ class CacheSpec extends FunSuite with ScalaFutures {
       (result, (end - start) / 1e9)
     }
 
-    println("test6")
-    val (result, secs) = time(Await.result(engine.assessLogged(rules(1), "memoized fizzbuzz"), 30 seconds).get)
+    val (result, secs) = time(Await.result(engine.assessNamedLogged(rules(1), "memoized fizzbuzz"), 30 seconds).get)
     assert(result == "1")
     assert(secs > 1)
 
-    val (result2, secs2) = time(Await.result(engine.assessLogged(rules(2), "memoized fizzbuzz"), 30 seconds).get)
+    val (result2, secs2) = time(Await.result(engine.assessNamedLogged(rules(2), "memoized fizzbuzz"), 30 seconds).get)
     assert(result2 == "2")
     assert(secs2 > 1)
 
-    val (result3, secs3) = time(Await.result(engine.assessLogged(rules(1)), 30 seconds).get)
+    val (result3, secs3) = time(Await.result(engine.assessNamedLogged(rules(1)), 30 seconds).get)
     assert(result3 == "1")
     assert(secs3 < 1)
   }
 
   test("fizzbuzz rules are logged with the rule name and value") {
+    val fizzBuzz = spy(new FizzBuzz())
+    val fizzPredicate:Predicate[Int] = Predicate[Int](fizzBuzz.divisibleByThree, "fizz-predicate")
+    val fizzBuzzPredicate:Predicate[Int] = Predicate[Int](n => all(fizzBuzz.divisibleByThree(n), fizzBuzz.divisibleByFive(n)), "fizzbuzz-predicate")
+    val buzzPredicate:Predicate[Int]  = Predicate[Int](fizzBuzz.divisibleByFive, "buzz-predicate")
+    val `else`:Predicate[Int] = Predicate[Int](_ => Future.successful(true), "finish")
+
     val rules = Seq(
       fizzBuzzPredicate -> "fizzbuzz",
       fizzPredicate -> "fizz",
       buzzPredicate -> "buzz",
-      `else` -> "number"
+      `else` -> ""
     )
 
-    println("test7")
     val result = Await.result(engine.loggingAssess(rules)(15), 5 seconds).get
     assert(result == "fizzbuzz")
     verify(fizzBuzz).divisibleByThree(15)
     verify(fizzBuzz).divisibleByFive(15)
     verify(fakeLogger).info("Evaluting predicate fizzbuzz-predicate")
     verify(fakeLogger).info("Predicate fizzbuzz-predicate has value true")
+    val result2 = Await.result(engine.loggingAssess(rules)(1), 5 seconds).get
+    assert(result2 == "1")
   }
 
   //  test("fizzbuzz rules are logged with the rule name and value") {
