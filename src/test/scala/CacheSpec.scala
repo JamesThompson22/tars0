@@ -17,7 +17,7 @@ import scala.language.postfixOps
 class CacheSpec extends FunSuite with ScalaFutures {
   val fakeLogger:Logger = Mockito.spy(classOf[Logger])
   val realLogger:Logger = LoggerFactory.getLogger("testLogger")
-  val engine = new RulesEngine(realLogger)
+  val engine = new RulesEngine(fakeLogger)
 
   test("Rules can be constructed for fizzbuzz as a table") {
     val scenarios = Tables.Table[Int, String](
@@ -43,10 +43,10 @@ class CacheSpec extends FunSuite with ScalaFutures {
     val fizzBuzz = new FizzBuzz()
 
     def rules(n: Int) = Seq(
-      (() => all(fizzBuzz.divisibleByThree(n), fizzBuzz.divisibleByFive(n))) -> "fizzbuzz",
-      (() => fizzBuzz.divisibleByThree(n)) -> "fizz",
-      (() => fizzBuzz.divisibleByFive(n)) -> "buzz",
-      (() => Future(true)) -> n.toString
+      "Divisable by 5 & 3" -> (() => all(fizzBuzz.divisibleByThree(n), fizzBuzz.divisibleByFive(n))) -> "fizzbuzz",
+      "Divisable by 3" -> (() => fizzBuzz.divisibleByThree(n)) -> "fizz",
+      "Divisable by 5" -> (() => fizzBuzz.divisibleByFive(n)) -> "buzz",
+      "Not devisable by 5 or 3" -> (() => Future(true)) -> n.toString
     )
 
     TableDrivenPropertyChecks.forAll(scenarios) { (n, expected) =>
@@ -59,10 +59,10 @@ class CacheSpec extends FunSuite with ScalaFutures {
     val fizzBuzz = spy(new FizzBuzz())
 
     def rules(n: Int) = Seq(
-      (() => all(fizzBuzz.divisibleByThree(n), fizzBuzz.divisibleByFive(n))) -> "fizzbuzz",
-      (() => fizzBuzz.divisibleByThree(n)) -> "fizz",
-      (() => fizzBuzz.divisibleByFive(n)) -> "buzz",
-      (() => Future(true)) -> n.toString
+      "Divisable by 5 & 3" -> (() => all(fizzBuzz.divisibleByThree(n), fizzBuzz.divisibleByFive(n))) -> "fizzbuzz",
+      "Divisable by 3" -> (() => fizzBuzz.divisibleByThree(n)) -> "fizz",
+      "Divisable by 5" -> (() => fizzBuzz.divisibleByFive(n)) -> "buzz",
+      "Not devisable by 5 or 3" -> (() => Future(true)) -> n.toString
     )
 
     val result = Await.result(engine.assessLogged(rules(15), "fizzbuzz"), 5 seconds).get
@@ -75,10 +75,10 @@ class CacheSpec extends FunSuite with ScalaFutures {
     val fizzBuzz = spy(new FizzBuzz())
 
     def rules(n: Int) = Seq(
-      (() => all(fizzBuzz.mDivisibleByThree(n), fizzBuzz.mDivisibleByFive(n))) -> "fizzbuzz",
-      (() => fizzBuzz.mDivisibleByThree(n)) -> "fizz",
-      (() => fizzBuzz.mDivisibleByFive(n)) -> "buzz",
-      (() => Future(true)) -> n.toString
+      "Divisable by 5 & 3" -> (() => all(fizzBuzz.mDivisibleByThree(n), fizzBuzz.mDivisibleByFive(n))) -> "fizzbuzz",
+      "Divisable by 3" -> (() => fizzBuzz.mDivisibleByThree(n)) -> "fizz",
+      "Divisable by 5" -> (() => fizzBuzz.mDivisibleByFive(n)) -> "buzz",
+      "Not devisable by 5 or 3" -> (() => Future(true)) -> n.toString
     )
 
     val result = Await.result(engine.assessLogged(rules(1), "memoized fizzbuzz"), 5 seconds).get
@@ -91,13 +91,13 @@ class CacheSpec extends FunSuite with ScalaFutures {
     val fizzBuzz = spy(new FizzBuzz())
 
     def rules(n: Int) = Seq(
-      (() => all(fizzBuzz.mDivisibleByThreeP(n), fizzBuzz.mDivisibleByFiveP(n))) -> "fizzbuzz",
-      (() => fizzBuzz.mDivisibleByThreeP(n)) -> "fizz",
-      (() => fizzBuzz.mDivisibleByFiveP(n)) -> "buzz",
-      (() => Future(true)) -> n.toString
+      "Divisable by 5 & 3" -> (() => all(fizzBuzz.mDivisibleByThreeP(n), fizzBuzz.mDivisibleByFiveP(n))) -> "fizzbuzz",
+      "Divisable by 3" -> (() => fizzBuzz.mDivisibleByThreeP(n)) -> "fizz",
+      "Divisable by 5" -> (() => fizzBuzz.mDivisibleByFiveP(n)) -> "buzz",
+      "Not devisable by 5 or 3" -> (() => Future(true)) -> n.toString
     )
 
-    val result = Await.result(engine.assessLogged(rules(1), "memoized fizzbuzz"), 30 seconds).get
+    val result = Await.result(engine.assessLogged(rules(1), "memoized fizzbuzz with multiple parameters"), 30 seconds).get
     assert(result == "1")
     verify(fizzBuzz).divisibleBy(1, 3)
     verify(fizzBuzz).divisibleBy(1, 5)
@@ -108,10 +108,10 @@ class CacheSpec extends FunSuite with ScalaFutures {
     val fizzBuzz = spy(new FizzBuzz())
 
     def rules(n: Int) = Seq(
-      (() => all(fizzBuzz.mDivisibleByThreeP(n), fizzBuzz.mDivisibleByFiveP(n))) -> "fizzbuzz",
-      (() => fizzBuzz.mDivisibleByThreeP(n)) -> "fizz",
-      (() => fizzBuzz.mDivisibleByFiveP(n)) -> "buzz",
-      (() => Future(true)) -> n.toString
+      "Divisable by 5 & 3" -> (() => all(fizzBuzz.mDivisibleByThreeP(n), fizzBuzz.mDivisibleByFiveP(n))) -> "fizzbuzz",
+      "Divisable by 3" -> (() => fizzBuzz.mDivisibleByThreeP(n)) -> "fizz",
+      "Divisable by 5" -> (() => fizzBuzz.mDivisibleByFiveP(n)) -> "buzz",
+      "Not devisable by 5 or 3" -> (() => Future(true)) -> n.toString
     )
 
     def time[R](block: => R): (R, Double) = {
@@ -121,11 +121,11 @@ class CacheSpec extends FunSuite with ScalaFutures {
       (result, (end - start) / 1e9)
     }
 
-    val (result, secs) = time(Await.result(engine.assessLogged(rules(1), "memoized fizzbuzz"), 30 seconds).get)
+    val (result, secs) = time(Await.result(engine.assessLogged(rules(1), "memoized fizzbuzz with multiple parameters"), 30 seconds).get)
     assert(result == "1")
     assert(secs > 1)
 
-    val (result2, secs2) = time(Await.result(engine.assessLogged(rules(1), "memoized fizzbuzz"), 30 seconds).get)
+    val (result2, secs2) = time(Await.result(engine.assessLogged(rules(1), "memoized fizzbuzz with multiple parameters"), 30 seconds).get)
     assert(result2 == "1")
     assert(secs2 < 1)
   }
@@ -134,10 +134,10 @@ class CacheSpec extends FunSuite with ScalaFutures {
     val fizzBuzz = spy(new FizzBuzz())
 
     def rules(n: Int) = Seq(
-      "All" -> (() => all(fizzBuzz.mDivisibleByThreeP(n), fizzBuzz.mDivisibleByFiveP(n))) -> "fizzbuzz",
-      "Three" -> (() => fizzBuzz.mDivisibleByThreeP(n)) -> "fizz",
-      "Five" -> (() => fizzBuzz.mDivisibleByFiveP(n)) -> "buzz",
-      "None" -> (() => Future(true)) -> n.toString
+      "Divisable by 5 & 3" -> (() => all(fizzBuzz.mDivisibleByThreeP(n), fizzBuzz.mDivisibleByFiveP(n))) -> "fizzbuzz",
+      "Divisable by 3" -> (() => fizzBuzz.mDivisibleByThreeP(n)) -> "fizz",
+      "Divisable by 5" -> (() => fizzBuzz.mDivisibleByFiveP(n)) -> "buzz",
+      "Not devisable by 5 or 3" -> (() => Future(true)) -> n.toString
     )
 
     def time[R](block: => R): (R, Double) = {
@@ -147,15 +147,15 @@ class CacheSpec extends FunSuite with ScalaFutures {
       (result, (end - start) / 1e9)
     }
 
-    val (result, secs) = time(Await.result(engine.assessNamedLogged(rules(1), "memoized fizzbuzz"), 30 seconds).get)
+    val (result, secs) = time(Await.result(engine.assessLogged(rules(1), "memoized fizzbuzz with multiple parameters"), 30 seconds).get)
     assert(result == "1")
     assert(secs > 1)
 
-    val (result2, secs2) = time(Await.result(engine.assessNamedLogged(rules(2), "memoized fizzbuzz"), 30 seconds).get)
+    val (result2, secs2) = time(Await.result(engine.assessLogged(rules(2), "memoized fizzbuzz with multiple parameters"), 30 seconds).get)
     assert(result2 == "2")
     assert(secs2 > 1)
 
-    val (result3, secs3) = time(Await.result(engine.assessNamedLogged(rules(1)), 30 seconds).get)
+    val (result3, secs3) = time(Await.result(engine.assessLogged(rules(1)), 30 seconds).get)
     assert(result3 == "1")
     assert(secs3 < 1)
   }

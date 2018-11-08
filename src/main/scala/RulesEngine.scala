@@ -18,25 +18,7 @@ class RulesEngine(log: Logger) {
     }
   }
 
-  def assessLogged[V](rules: Seq[(() => Future[Boolean], V)], ruleset: String = "test"): Future[Option[V]] = {
-    log.info(s"assessing ruleset $ruleset")
-    rules.foldLeft(Future(Option.empty[V])) { (accum, curr) =>
-      accum flatMap {
-        case v@Some(_) =>  Future(v)
-        case None => curr._1().map {
-          if (_) {
-            log.info("OUTCOME: " + curr._2)
-            Some(curr._2)
-          } else {
-            log.debug("rule not met: " + curr._2)
-            None
-          }
-        }
-      }
-    }
-  }
-
-  def assessNamedLogged[V](rules: Seq[((String, () => Future[Boolean]), String)], ruleset: String = "test"): Future[Option[String]] = {
+  def assessLogged[V](rules: Seq[((String, () => Future[Boolean]), String)], ruleset: String = "test"): Future[Option[String]] = {
     log.info(s"assessing ruleset $ruleset")
     rules.foldLeft(Future(Option.empty[String])) { (accum, curr) =>
       accum flatMap {

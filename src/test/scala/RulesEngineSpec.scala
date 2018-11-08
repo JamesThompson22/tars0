@@ -20,16 +20,18 @@ class RulesEngineSpec extends FunSuite with ScalaFutures {
   }
 
   test("A sequence of rules returns the value of the leftmost rule where the precedent evaluates to Future.successful(true) when assessed") {
-    val rules = Seq((() => Future(true), "FIRST-TRUE-RULE"), (() => Future(false), "FALSE-RULE"))
+    val rules = Seq(
+      "FIRST_RULE" -> (() => Future(true)) -> "FIRST-TRUE-RULE",
+      "SECOND-RULE" -> (() => Future(false)) -> "FALSE-RULE")
     val result = Await.result(engine.assessLogged(rules), 5 seconds)
     assert(result contains "FIRST-TRUE-RULE")
   }
 
   test("A sequence of rules with some precedents evaluating to false at the beginning, skips over them to the first true rule") {
     val rules = Seq(
-      (() => Future(false)) -> "FIRST-FALSE-RULE",
-      (() => Future(true))  -> "FIRST-TRUE-RULE",
-      (() => Future(false)) -> "SECOND-FALSE-RULE"
+      "FIRST_RULE" -> (() => Future(false)) -> "FIRST-FALSE-RULE",
+      "SECOND-RULE" -> (() => Future(true))  -> "FIRST-TRUE-RULE",
+      "THIRD-RULE" -> (() => Future(false)) -> "SECOND-FALSE-RULE"
     )
     val result = Await.result(engine.assessLogged(rules), 5 seconds)
     assert(result contains "FIRST-TRUE-RULE")
@@ -37,10 +39,10 @@ class RulesEngineSpec extends FunSuite with ScalaFutures {
 
   test("A sequence of rules with some precedents evaluating to false at the beginning, skips over them to the first true rule, subsequent true rules are ignored") {
     val rules = Seq(
-      (() => Future(false)) -> "FIRST-FALSE-RULE",
-      (() => Future(true))  -> "FIRST-TRUE-RULE",
-      (() => Future(false)) -> "SECOND-FALSE-RULE",
-      (() => Future(true)) -> "SECOND-TRUE-RULE"
+      "FIRST_RULE" -> (() => Future(false)) -> "FIRST-FALSE-RULE",
+      "SECOND-RULE" -> (() => Future(true))  -> "FIRST-TRUE-RULE",
+      "THIRD-RULE" -> (() => Future(false)) -> "SECOND-FALSE-RULE",
+      "FOURTH-RULE" -> (() => Future(true)) -> "SECOND-TRUE-RULE"
     )
     val result = Await.result(engine.assessLogged(rules), 5 seconds)
     assert(result contains "FIRST-TRUE-RULE")
@@ -48,10 +50,10 @@ class RulesEngineSpec extends FunSuite with ScalaFutures {
 
   test("A sequence of rules with all precedents evaluating to false returns None") {
     val rules = Seq(
-      (() => Future(false)) -> "FIRST-FALSE-RULE",
-      (() => Future(false))  -> "SECOND-FALSE-RULE",
-      (() => Future(false)) -> "THIRD-FALSE-RULE",
-      (() => Future(false)) -> "FOURTH-FALSE-RULE"
+      "FIRST_RULE" -> (() => Future(false)) -> "FIRST-FALSE-RULE",
+      "SECOND-RULE" -> (() => Future(false))  -> "SECOND-FALSE-RULE",
+      "THIRD-RULE" -> (() => Future(false)) -> "THIRD-FALSE-RULE",
+      "FOURTH-RULE" -> (() => Future(false)) -> "FOURTH-FALSE-RULE"
     )
     val result = Await.result(engine.assessLogged(rules), 5 seconds)
     assert(result isEmpty)
@@ -59,10 +61,10 @@ class RulesEngineSpec extends FunSuite with ScalaFutures {
 
   test("A sequence of rules with an early true followed by a failure returns the value associated with the true") {
     val rules = Seq(
-      (() => Future(false)) -> "FIRST-FALSE-RULE",
-      (() => Future(true))  -> "FIRST-TRUE-RULE",
-      (() => Future.failed(new RuntimeException("fail"))) -> "FAIL",
-      (() => Future(false)) -> "THIRD-FALSE-RULE"
+      "FIRST_RULE" -> (() => Future(false)) -> "FIRST-FALSE-RULE",
+      "SECOND-RULE" -> (() => Future(true))  -> "FIRST-TRUE-RULE",
+      "THIRD-RULE" -> (() => Future.failed(new RuntimeException("fail"))) -> "FAIL",
+      "FOURTH-RULE" -> (() => Future(false)) -> "THIRD-FALSE-RULE"
     )
     val result = Await.result(engine.assessLogged(rules), 5 seconds)
     assert(result contains "FIRST-TRUE-RULE")
@@ -70,10 +72,10 @@ class RulesEngineSpec extends FunSuite with ScalaFutures {
 
   test("A sequence of rules with an early fail followed by a true returns the failure") {
     val rules = Seq(
-      (() => Future(false)) -> "FIRST-FALSE-RULE",
-      (() => Future.failed(new RuntimeException("fail"))) -> "FAIL",
-      (() => Future(true))  -> "FIRST-TRUE-RULE",
-      (() => Future(false)) -> "THIRD-FALSE-RULE"
+      "FIRST_RULE" -> (() => Future(false)) -> "FIRST-FALSE-RULE",
+      "SECOND-RULE" -> (() => Future.failed(new RuntimeException("fail"))) -> "FAIL",
+      "THIRD-RULE" -> (() => Future(true))  -> "FIRST-TRUE-RULE",
+      "FOURTH-RULE" -> (() => Future(false)) -> "THIRD-FALSE-RULE"
     )
     val result = intercept[RuntimeException] {
       Await.result(engine.assessLogged(rules), 5 seconds)
@@ -83,11 +85,11 @@ class RulesEngineSpec extends FunSuite with ScalaFutures {
 
   test("A sequence of rules with an early fail followed another fail followed by a true returns the first failure") {
     val rules = Seq(
-      (() => Future(false)) -> "FIRST-FALSE-RULE",
-      (() => Future.failed(new RuntimeException("fail0"))) -> "FAIL0",
-      (() => Future.failed(new RuntimeException("fail1"))) -> "FAIL1",
-      (() => Future(true))  -> "FIRST-TRUE-RULE",
-      (() => Future(false)) -> "THIRD-FALSE-RULE"
+      "FIRST_RULE" -> (() => Future(false)) -> "FIRST-FALSE-RULE",
+      "SECOND-RULE" -> (() => Future.failed(new RuntimeException("fail0"))) -> "FAIL0",
+      "THIRD-RULE" -> (() => Future.failed(new RuntimeException("fail1"))) -> "FAIL1",
+      "FOURTH-RULE" -> (() => Future(true))  -> "FIRST-TRUE-RULE",
+      "RULE-THE-FIFTH" ->(() => Future(false)) -> "THIRD-FALSE-RULE"
     )
     val result = intercept[RuntimeException] {
       Await.result(engine.assessLogged(rules), 5 seconds)
